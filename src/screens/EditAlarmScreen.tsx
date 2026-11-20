@@ -1,10 +1,11 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Appbar, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
 
-import { createBlankAlarm, getAlarm, saveAlarm } from '../data/alarms';
+import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alarms';
 import type { RootStackParamList } from '../navigation/types';
 import type { AlarmDraft } from '../types/alarm';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
@@ -14,22 +15,35 @@ import { styles } from './EditAlarmScreen.styles';
 type Props = NativeStackScreenProps<RootStackParamList, 'EditAlarm'>;
 
 export default function EditAlarmScreen({ navigation, route }: Props) {
+  const db = useSQLiteContext();
+
   // No alarmId means we are creating a new alarm.
   const alarmId = route.params?.alarmId;
   const isNew = alarmId === undefined;
-  const alarm = isNew ? undefined : getAlarm(alarmId);
-  const missing = !isNew && !alarm;
 
-  // If the alarm mysteriously disappears we should go back
+  const [initial, setInitial] = useState<AlarmDraft | null>(() =>
+    isNew ? createBlankAlarm() : null,
+  );
+
   useEffect(() => {
-    if (missing) navigation.goBack();
-  }, [missing, navigation]);
+    if (alarmId === undefined) return;
 
-  if (missing) return null;
+    let active = true;
+    getAlarm(db, alarmId).then((alarm) => {
+      if (!active) return;
+      if (alarm) setInitial(alarm);
+      else navigation.goBack();
+    });
+    return () => {
+      active = false;
+    };
+  }, [db, alarmId, navigation]);
+
+  if (!initial) return null;
 
   return (
     <EditAlarmForm
-      initial={alarm ?? createBlankAlarm()}
+      initial={initial}
       title={isNew ? 'New alarm' : 'Edit alarm'}
       onClose={navigation.goBack}
     />
@@ -44,8 +58,12 @@ type FormProps = {
 
 function EditAlarmForm({ initial, title, onClose }: FormProps) {
   const theme = useTheme();
+  const db = useSQLiteContext();
+
+  // Draft of alarm before being saved
   const [draft, setDraft] = useState<AlarmDraft>(initial);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const toggleDay = (day: number) => {
     setDraft((current) => ({
@@ -56,9 +74,25 @@ function EditAlarmForm({ initial, title, onClose }: FormProps) {
     }));
   };
 
-  const handleSave = () => {
-    saveAlarm(draft);
+  const handleSave = async () => {
+    setBusy(true);
+    await saveAlarm(db, draft);
     onClose();
+  };
+
+  const handleDelete = () => {
+    Alert.alert('Delete alarm?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          await deleteAlarm(db, draft.id!);
+          onClose();
+        },
+      },
+    ]);
   };
 
   return (
@@ -66,7 +100,15 @@ function EditAlarmForm({ initial, title, onClose }: FormProps) {
       <Appbar.Header>
         <Appbar.BackAction onPress={onClose} />
         <Appbar.Content title={title} />
-        <Appbar.Action icon="check" accessibilityLabel="Save" onPress={handleSave} />
+        {draft.id !== undefined && (
+          <Appbar.Action
+            icon="delete"
+            accessibilityLabel="Delete"
+            disabled={busy}
+            onPress={handleDelete}
+          />
+        )}
+        <Appbar.Action icon="check" accessibilityLabel="Save" disabled={busy} onPress={handleSave} />
       </Appbar.Header>
 
       <View style={styles.body}>

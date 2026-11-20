@@ -11,8 +11,12 @@ export const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    right: 16,
+    alignSelf: 'center',
     bottom: 16,
+  },
+  empty: {
+    textAlign: 'center',
+    marginTop: 32,
   },
   time: {
     fontSize: 36,

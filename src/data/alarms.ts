@@ -1,22 +1,65 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
 import type { Alarm, AlarmDraft } from '../types/alarm';
 
-// Hard-coded until the SQLite database is set up.
-const ALARMS: Alarm[] = [{ id: 1, hour: 7, minute: 30, days: [1, 2, 3, 4, 5] }];
+type AlarmRow = { id: number; hour: number; minute: number; days: number };
 
-export function getAlarms(): Alarm[] {
-  return ALARMS;
-}
+// `days` is stored as a bitmask: Sunday = bit 0 ... Saturday = bit 6.
+const daysToMask = (days: number[]): number => days.reduce((mask, day) => mask | (1 << day), 0);
 
-export function getAlarm(id: number): Alarm | undefined {
-  return ALARMS.find((alarm) => alarm.id === id);
-}
+const maskToDays = (mask: number): number[] =>
+  [0, 1, 2, 3, 4, 5, 6].filter((day) => mask & (1 << day));
 
-/** A new alarm with default values. */
+const toAlarm = ({ id, hour, minute, days }: AlarmRow): Alarm => ({
+  id,
+  hour,
+  minute,
+  days: maskToDays(days),
+});
+
+/** A new alarm with default values (for creating new alarms)*/
 export function createBlankAlarm(): AlarmDraft {
   return { hour: 7, minute: 0, days: [] };
 }
 
-/** Save an alarm, update it if it has an `id`, otherwise creates it. */
-export function saveAlarm(_alarm: AlarmDraft): void {
-  // TODO: persist once the SQLite database is set up.
+/** Get all alarms ordered by time */
+export async function getAlarms(db: SQLiteDatabase): Promise<Alarm[]> {
+  const rows = await db.getAllAsync<AlarmRow>(
+    'SELECT id, hour, minute, days FROM alarms ORDER BY hour, minute, id',
+  );
+  return rows.map(toAlarm);
+}
+
+export async function getAlarm(db: SQLiteDatabase, id: number): Promise<Alarm | null> {
+  const row = await db.getFirstAsync<AlarmRow>(
+    'SELECT id, hour, minute, days FROM alarms WHERE id = ?',
+    id,
+  );
+  return row && toAlarm(row);
+}
+
+/** Updates the alarm if id is set, otherwise create a new one */
+export async function saveAlarm(db: SQLiteDatabase, alarm: AlarmDraft): Promise<void> {
+  const days = daysToMask(alarm.days);
+
+  if (alarm.id === undefined) {
+    await db.runAsync(
+      'INSERT INTO alarms (hour, minute, days) VALUES (?, ?, ?)',
+      alarm.hour,
+      alarm.minute,
+      days,
+    );
+  } else {
+    await db.runAsync(
+      'UPDATE alarms SET hour = ?, minute = ?, days = ? WHERE id = ?',
+      alarm.hour,
+      alarm.minute,
+      days,
+      alarm.id,
+    );
+  }
+}
+
+export async function deleteAlarm(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM alarms WHERE id = ?', id);
 }
