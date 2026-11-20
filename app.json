@@ -28,7 +28,9 @@
       }
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-audio",
+      "expo-asset"
     ]
   }
 }

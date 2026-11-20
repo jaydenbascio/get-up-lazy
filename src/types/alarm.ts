@@ -6,6 +6,8 @@ export type Alarm = {
   minute: number;
   /** Days the alarm is active, 0 = Sunday ... 6 = Saturday */
   days: number[];
+  /** The `id` of the alarm's sound */
+  soundId: number;
 };
 
 /** An alarm being edited (id can be missing for new alarms) */

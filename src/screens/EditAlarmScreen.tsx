@@ -1,13 +1,18 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useAudioPlayer } from 'expo-audio';
+import { File } from 'expo-file-system';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
-import { Appbar, Text, TouchableRipple, useTheme } from 'react-native-paper';
+import { Alert, ScrollView, View } from 'react-native';
+import { Appbar, Button, RadioButton, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
 
 import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alarms';
+import { getSoundUri } from '../data/soundStorage';
+import { addSound, getSounds } from '../data/sounds';
 import type { RootStackParamList } from '../navigation/types';
 import type { AlarmDraft } from '../types/alarm';
+import type { Sound } from '../types/sound';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
 import { formatTime } from '../utils/time';
 import { styles } from './EditAlarmScreen.styles';
@@ -21,29 +26,31 @@ export default function EditAlarmScreen({ navigation, route }: Props) {
   const alarmId = route.params?.alarmId;
   const isNew = alarmId === undefined;
 
-  const [initial, setInitial] = useState<AlarmDraft | null>(() =>
-    isNew ? createBlankAlarm() : null,
-  );
+  const [loaded, setLoaded] = useState<{ initial: AlarmDraft; sounds: Sound[] } | null>(null);
 
   useEffect(() => {
-    if (alarmId === undefined) return;
-
     let active = true;
-    getAlarm(db, alarmId).then((alarm) => {
+    (async () => {
+      const sounds = await getSounds(db);
+      // A new alarm defaults to the first sound
+      const alarm =
+        alarmId === undefined ? createBlankAlarm(sounds[0].id) : await getAlarm(db, alarmId);
+
       if (!active) return;
-      if (alarm) setInitial(alarm);
+      if (alarm) setLoaded({ initial: alarm, sounds });
       else navigation.goBack();
-    });
+    })();
     return () => {
       active = false;
     };
   }, [db, alarmId, navigation]);
 
-  if (!initial) return null;
+  if (!loaded) return null;
 
   return (
     <EditAlarmForm
-      initial={initial}
+      initial={loaded.initial}
+      initialSounds={loaded.sounds}
       title={isNew ? 'New alarm' : 'Edit alarm'}
       onClose={navigation.goBack}
     />
@@ -52,18 +59,42 @@ export default function EditAlarmScreen({ navigation, route }: Props) {
 
 type FormProps = {
   initial: AlarmDraft;
+  initialSounds: Sound[];
   title: string;
   onClose: () => void;
 };
 
-function EditAlarmForm({ initial, title, onClose }: FormProps) {
+function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
   const theme = useTheme();
   const db = useSQLiteContext();
+  const player = useAudioPlayer();
 
   // Draft of alarm before being saved
   const [draft, setDraft] = useState<AlarmDraft>(initial);
+  const [sounds, setSounds] = useState<Sound[]>(initialSounds);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Selecting a sound also plays a preview of it
+  const selectSound = (sound: Sound) => {
+    setDraft((current) => ({ ...current, soundId: sound.id }));
+    player.replace({ uri: getSoundUri(sound.file) });
+    player.play();
+  };
+
+  // Add an audio file with the file picker
+  const handleAddSound = async () => {
+    try {
+      const picked = await File.pickFileAsync({ mimeTypes: 'audio/*' });
+      if (picked.canceled) return;
+
+      const sound = await addSound(db, picked.result);
+      setSounds((current) => [...current, sound]);
+      selectSound(sound);
+    } catch (error) {
+      Alert.alert('Could not add the file', error instanceof Error ? error.message : String(error));
+    }
+  };
 
   const toggleDay = (day: number) => {
     setDraft((current) => ({
@@ -111,7 +142,7 @@ function EditAlarmForm({ initial, title, onClose }: FormProps) {
         <Appbar.Action icon="check" accessibilityLabel="Save" disabled={busy} onPress={handleSave} />
       </Appbar.Header>
 
-      <View style={styles.body}>
+      <ScrollView contentContainerStyle={styles.body}>
         <TouchableRipple
           style={styles.timeButton}
           onPress={() => setPickerVisible(true)}
@@ -157,7 +188,22 @@ function EditAlarmForm({ initial, title, onClose }: FormProps) {
             })}
           </View>
         </View>
-      </View>
+
+        <View style={styles.section}>
+          <Text variant="titleMedium">Sound</Text>
+          <RadioButton.Group
+            value={String(draft.soundId)}
+            onValueChange={(value) => selectSound(sounds.find((s) => String(s.id) === value)!)}
+          >
+            {sounds.map((sound) => (
+              <RadioButton.Item key={sound.id} label={sound.name} value={String(sound.id)} />
+            ))}
+          </RadioButton.Group>
+          <Button mode="outlined" icon="plus" onPress={handleAddSound}>
+            Add file
+          </Button>
+        </View>
+      </ScrollView>
 
       <TimePickerModal
         visible={pickerVisible}

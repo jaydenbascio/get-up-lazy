@@ -5,7 +5,6 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   body: {
-    flex: 1,
     padding: 16,
     gap: 32,
   },

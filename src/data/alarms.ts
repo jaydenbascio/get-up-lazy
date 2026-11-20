@@ -2,39 +2,34 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { Alarm, AlarmDraft } from '../types/alarm';
 
-type AlarmRow = { id: number; hour: number; minute: number; days: number };
+type AlarmRow = { id: number; hour: number; minute: number; days: number; soundId: number };
 
-// `days` is stored as a bitmask: Sunday = bit 0 ... Saturday = bit 6.
+const SELECT_ALARM = 'SELECT id, hour, minute, days, sound_id AS soundId FROM alarms';
+
+// Turn a list of days (0 = Sunday, 6 = Saturday) into a single 7 bit bitmask
 const daysToMask = (days: number[]): number => days.reduce((mask, day) => mask | (1 << day), 0);
 
 const maskToDays = (mask: number): number[] =>
   [0, 1, 2, 3, 4, 5, 6].filter((day) => mask & (1 << day));
 
-const toAlarm = ({ id, hour, minute, days }: AlarmRow): Alarm => ({
-  id,
-  hour,
-  minute,
+const toAlarm = ({ days, ...rest }: AlarmRow): Alarm => ({
+  ...rest,
   days: maskToDays(days),
 });
 
-/** A new alarm with default values (for creating new alarms)*/
-export function createBlankAlarm(): AlarmDraft {
-  return { hour: 7, minute: 0, days: [] };
+/** A new alarm with default values (for creating new alarms) */
+export function createBlankAlarm(soundId: number): AlarmDraft {
+  return { hour: 7, minute: 0, days: [], soundId };
 }
 
 /** Get all alarms ordered by time */
 export async function getAlarms(db: SQLiteDatabase): Promise<Alarm[]> {
-  const rows = await db.getAllAsync<AlarmRow>(
-    'SELECT id, hour, minute, days FROM alarms ORDER BY hour, minute, id',
-  );
+  const rows = await db.getAllAsync<AlarmRow>(`${SELECT_ALARM} ORDER BY hour, minute, id`);
   return rows.map(toAlarm);
 }
 
 export async function getAlarm(db: SQLiteDatabase, id: number): Promise<Alarm | null> {
-  const row = await db.getFirstAsync<AlarmRow>(
-    'SELECT id, hour, minute, days FROM alarms WHERE id = ?',
-    id,
-  );
+  const row = await db.getFirstAsync<AlarmRow>(`${SELECT_ALARM} WHERE id = ?`, id);
   return row && toAlarm(row);
 }
 
@@ -44,17 +39,19 @@ export async function saveAlarm(db: SQLiteDatabase, alarm: AlarmDraft): Promise<
 
   if (alarm.id === undefined) {
     await db.runAsync(
-      'INSERT INTO alarms (hour, minute, days) VALUES (?, ?, ?)',
+      'INSERT INTO alarms (hour, minute, days, sound_id) VALUES (?, ?, ?, ?)',
       alarm.hour,
       alarm.minute,
       days,
+      alarm.soundId,
     );
   } else {
     await db.runAsync(
-      'UPDATE alarms SET hour = ?, minute = ?, days = ? WHERE id = ?',
+      'UPDATE alarms SET hour = ?, minute = ?, days = ?, sound_id = ? WHERE id = ?',
       alarm.hour,
       alarm.minute,
       days,
+      alarm.soundId,
       alarm.id,
     );
   }
