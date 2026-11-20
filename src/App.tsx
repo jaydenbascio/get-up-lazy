@@ -1,42 +1,20 @@
 import { StatusBar } from 'expo-status-bar';
-import { BottomNavigation, MD2DarkTheme, PaperProvider } from 'react-native-paper';
+import { PaperProvider } from 'react-native-paper';
+import { en, registerTranslation } from 'react-native-paper-dates';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { styles } from './App.styles';
-import { NavigationProvider, tabs, useNavigation } from './NavigationProvider';
+import StackNavigator from './navigation/StackNavigator';
+import { NavigationProvider } from './NavigationProvider';
+import { paperTheme } from './theme';
 
-const routes = tabs.map(({ key, title, icon }) => ({
-  key,
-  title,
-  focusedIcon: icon,
-}));
-
-const screens = Object.fromEntries(tabs.map(({ key, Screen }) => [key, Screen]));
-
-const renderScene = ({ route }: { route: { key: string } }) => {
-  const Screen = screens[route.key];
-  return <Screen />;
-};
-
-function AppContent() {
-  const { index, setIndex } = useNavigation();
-
-  return (
-    <BottomNavigation
-      style={styles.container}
-      navigationState={{ index, routes }}
-      onIndexChange={setIndex}
-      renderScene={renderScene}
-    />
-  );
-}
+registerTranslation('en', en);
 
 export default function App() {
   return (
     <NavigationProvider>
       <SafeAreaProvider>
-        <PaperProvider theme={MD2DarkTheme}>
-          <AppContent />
+        <PaperProvider theme={paperTheme}>
+          <StackNavigator />
           <StatusBar style="auto" />
         </PaperProvider>
       </SafeAreaProvider>
