@@ -4,9 +4,9 @@ import { View } from 'react-native';
 import { Appbar, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
 
-import { getAlarm } from '../data/alarms';
+import { createBlankAlarm, getAlarm, saveAlarm } from '../data/alarms';
 import type { RootStackParamList } from '../navigation/types';
-import type { Alarm } from '../types/alarm';
+import type { AlarmDraft } from '../types/alarm';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
 import { formatTime } from '../utils/time';
 import { styles } from './EditAlarmScreen.styles';
@@ -14,21 +14,37 @@ import { styles } from './EditAlarmScreen.styles';
 type Props = NativeStackScreenProps<RootStackParamList, 'EditAlarm'>;
 
 export default function EditAlarmScreen({ navigation, route }: Props) {
-  const alarm = getAlarm(route.params.alarmId);
+  // No alarmId means we are creating a new alarm.
+  const alarmId = route.params?.alarmId;
+  const isNew = alarmId === undefined;
+  const alarm = isNew ? undefined : getAlarm(alarmId);
+  const missing = !isNew && !alarm;
 
   // If the alarm mysteriously disappears we should go back
   useEffect(() => {
-    if (!alarm) navigation.goBack();
-  }, [alarm, navigation]);
+    if (missing) navigation.goBack();
+  }, [missing, navigation]);
 
-  if (!alarm) return null;
+  if (missing) return null;
 
-  return <EditAlarmForm alarm={alarm} onClose={navigation.goBack} />;
+  return (
+    <EditAlarmForm
+      initial={alarm ?? createBlankAlarm()}
+      title={isNew ? 'New alarm' : 'Edit alarm'}
+      onClose={navigation.goBack}
+    />
+  );
 }
 
-function EditAlarmForm({ alarm, onClose }: { alarm: Alarm; onClose: () => void }) {
+type FormProps = {
+  initial: AlarmDraft;
+  title: string;
+  onClose: () => void;
+};
+
+function EditAlarmForm({ initial, title, onClose }: FormProps) {
   const theme = useTheme();
-  const [draft, setDraft] = useState<Alarm>(alarm);
+  const [draft, setDraft] = useState<AlarmDraft>(initial);
   const [pickerVisible, setPickerVisible] = useState(false);
 
   const toggleDay = (day: number) => {
@@ -41,7 +57,7 @@ function EditAlarmForm({ alarm, onClose }: { alarm: Alarm; onClose: () => void }
   };
 
   const handleSave = () => {
-    // TODO: persist once the SQLite database is set up.
+    saveAlarm(draft);
     onClose();
   };
 
@@ -49,7 +65,7 @@ function EditAlarmForm({ alarm, onClose }: { alarm: Alarm; onClose: () => void }
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Appbar.Header>
         <Appbar.BackAction onPress={onClose} />
-        <Appbar.Content title="Edit alarm" />
+        <Appbar.Content title={title} />
         <Appbar.Action icon="check" accessibilityLabel="Save" onPress={handleSave} />
       </Appbar.Header>
 

@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FlatList, View } from 'react-native';
-import { Appbar, Card, Text, useTheme } from 'react-native-paper';
+import { Appbar, Card, FAB, Text, useTheme } from 'react-native-paper';
 
 import { getAlarms } from '../data/alarms';
 import type { RootStackParamList } from '../navigation/types';
@@ -31,6 +31,13 @@ export default function AlarmsScreen() {
             </Card.Content>
           </Card>
         )}
+      />
+
+      <FAB
+        icon="plus"
+        accessibilityLabel="Create alarm"
+        style={styles.fab}
+        onPress={() => navigation.navigate('EditAlarm')}
       />
     </View>
   );

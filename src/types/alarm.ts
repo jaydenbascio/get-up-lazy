@@ -7,3 +7,6 @@ export type Alarm = {
   /** Days the alarm is active, 0 = Sunday ... 6 = Saturday */
   days: number[];
 };
+
+/** An alarm being edited (id can be missing for new alarms) */
+export type AlarmDraft = Omit<Alarm, 'id'> & { id?: number };
