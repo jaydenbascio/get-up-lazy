@@ -35,6 +35,13 @@
       "expo-sqlite",
       "expo-audio",
       "expo-asset",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Used to scan the QR codes that turn off your alarms.",
+          "recordAudioAndroid": false
+        }
+      ],
       "./plugins/withShowWhenLocked"
     ]
   }

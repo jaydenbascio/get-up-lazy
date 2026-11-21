@@ -4,18 +4,31 @@ import { useAudioPlayer } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Appbar, Button, RadioButton, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
+import {
+  NestedReorderableList,
+  type ReorderableListReorderEvent,
+  reorderItems,
+  ScrollViewContainer,
+} from 'react-native-reorderable-list';
 
 import NameSoundDialog from '../components/NameSoundDialog';
 import SoundRow from '../components/SoundRow';
+import StepDialog from '../components/StepDialog';
+import StepRow from '../components/StepRow';
 import { cancelAlarm, scheduleAlarm } from '../alarms/scheduler';
 import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alarms';
 import { getSoundUri } from '../data/soundStorage';
 import { addSound, deleteSound, getSounds, isDefaultSound } from '../data/sounds';
 import type { RootStackParamList } from '../navigation/types';
-import { type AlarmDraft, MAX_QUADRATIC_COUNT, MIN_QUADRATIC_COUNT } from '../types/alarm';
+import {
+  type AlarmDraft,
+  type AlarmStep,
+  MAX_QUADRATIC_COUNT,
+  MIN_QUADRATIC_COUNT,
+} from '../types/alarm';
 import type { Sound } from '../types/sound';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
 import { confirmDelete } from '../utils/confirm';
@@ -23,6 +36,9 @@ import { formatTime } from '../utils/time';
 import { styles } from './EditAlarmScreen.styles';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditAlarm'>;
+
+/** A gap between two steps in a list so they aren't cluttered */
+const StepSeparator = () => <View style={styles.stepSeparator} />;
 
 export default function EditAlarmScreen({ navigation, route }: Props) {
   const db = useSQLiteContext();
@@ -82,6 +98,28 @@ function EditAlarmForm({ initial, initialSounds, title, onClose, onTest }: FormP
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editingStep, setEditingStep] = useState<AlarmStep | 'new' | null>(null);
+
+  // Update an existing step or add one at the end
+  const saveStep = (step: AlarmStep) => {
+    setDraft((current) => ({
+      ...current,
+      steps: current.steps.some((s) => s.key === step.key)
+        ? current.steps.map((s) => (s.key === step.key ? step : s))
+        : [...current.steps, step],
+    }));
+    setEditingStep(null);
+  };
+
+  // Called when a step is dropped in a new place.
+  const moveStep = ({ from, to }: ReorderableListReorderEvent) => {
+    setDraft((current) => ({ ...current, steps: reorderItems(current.steps, from, to) }));
+  };
+
+  const handleDeleteStep = (step: AlarmStep) =>
+    confirmDelete(`Delete "${step.name}"?`, () =>
+      setDraft((current) => ({ ...current, steps: current.steps.filter((s) => s.key !== step.key) })),
+    );
 
   // Selecting a sound also plays a preview of it
   const selectSound = (sound: Sound) => {
@@ -177,7 +215,7 @@ function EditAlarmForm({ initial, initialSounds, title, onClose, onTest }: FormP
         <Appbar.Action icon="check" accessibilityLabel="Save" disabled={busy} onPress={handleSave} />
       </Appbar.Header>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollViewContainer contentContainerStyle={styles.body}>
         <TouchableRipple
           style={styles.timeButton}
           onPress={() => setPickerVisible(true)}
@@ -240,6 +278,32 @@ function EditAlarmForm({ initial, initialSounds, title, onClose, onTest }: FormP
         </View>
 
         <View style={styles.section}>
+          <Text variant="titleMedium">Steps</Text>
+          <Text variant="bodySmall">
+            After the quadratics, scan each QR code in order to turn the alarm off. Hold a step
+            and drag it to change the order.
+          </Text>
+          <NestedReorderableList
+            scrollEnabled={false}
+            data={draft.steps}
+            keyExtractor={(step) => step.key}
+            onReorder={moveStep}
+            ItemSeparatorComponent={StepSeparator}
+            renderItem={({ item, index }) => (
+              <StepRow
+                step={item}
+                index={index}
+                onPress={() => setEditingStep(item)}
+                onDelete={() => handleDeleteStep(item)}
+              />
+            )}
+          />
+          <Button mode="outlined" icon="plus" onPress={() => setEditingStep('new')}>
+            Add step
+          </Button>
+        </View>
+
+        <View style={styles.section}>
           <Text variant="titleMedium">Sound</Text>
           <RadioButton.Group
             value={String(draft.soundId)}
@@ -261,7 +325,16 @@ function EditAlarmForm({ initial, initialSounds, title, onClose, onTest }: FormP
         <Button mode="contained-tonal" icon="alarm" onPress={handleTestAlarm}>
           Test Alarm
         </Button>
-      </ScrollView>
+      </ScrollViewContainer>
+
+      {editingStep && (
+        <StepDialog
+          key={editingStep === 'new' ? 'new' : editingStep.key}
+          step={editingStep === 'new' ? undefined : editingStep}
+          onCancel={() => setEditingStep(null)}
+          onSave={saveStep}
+        />
+      )}
 
       {pendingFile && (
         <NameSoundDialog

@@ -1,32 +1,37 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Button, ProgressBar, Text, TextInput, useTheme } from 'react-native-paper';
+import { Button, Text, TextInput, useTheme } from 'react-native-paper';
 
-import {
-  formatQuadratic,
-  generateQuadratic,
-  isCorrectAnswer,
-  parseInteger,
-} from '../alarms/quadratic';
+import CountdownBar from './CountdownBar';
 import { styles } from './FactoringChallenge.styles';
+import { formatQuadratic, generateQuadratic, isCorrectAnswer, parseInteger } from './quadratic';
+import { useCountdown } from './useCountdown';
 
 const TIME_LIMIT_MS = 20_000;
 
 type Props = {
+  /** How many quadratics must be solved in a row. */
   count: number;
+  /** The player failed: start the alarm sound again. */
   onFail: () => void;
-  onRestart: () => void;
+  /** After a failure, the player solved the quadratic: silence the alarm again. */
+  onSilence: () => void;
+  /** All the quadratics were solved. */
   onComplete: () => void;
 };
 
-export default function FactoringChallenge({ count, onFail, onRestart, onComplete }: Props) {
+/**
+ * Asks the player to find the zeros of a quadratic within the time limit, `count` times in a row.
+ * Running out of time or answering wrong is a failure: the alarm sounds again until
+ * the current quadratic is solved (no time limit), then the count starts again at 1.
+ */
+export default function FactoringChallenge({ count, onFail, onSilence, onComplete }: Props) {
   const theme = useTheme();
   const secondInput = useRef<{ focus: () => void } | null>(null);
 
   const [quadratic, setQuadratic] = useState(generateQuadratic);
   const [number, setNumber] = useState(1);
   const [failed, setFailed] = useState(false);
-  const [remainingMs, setRemainingMs] = useState(TIME_LIMIT_MS);
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
   const [message, setMessage] = useState('');
@@ -37,29 +42,21 @@ export default function FactoringChallenge({ count, onFail, onRestart, onComplet
     onFail();
   };
 
-  useEffect(() => {
-    if (failed) return;
-
-    const deadline = Date.now() + TIME_LIMIT_MS;
-    setRemainingMs(TIME_LIMIT_MS);
-
-    const interval = setInterval(() => {
-      const left = deadline - Date.now();
-      if (left <= 0) {
-        clearInterval(interval); // No time limit after a fail
-        fail("Time's up!");
-      } else {
-        setRemainingMs(left);
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [failed, quadratic]);
+  // Each quadratic gets its own time limit, and there is no limit after a fail.
+  const remainingMs = useCountdown({
+    limitMs: TIME_LIMIT_MS,
+    running: !failed,
+    resetKey: quadratic,
+    onExpire: () => fail("Time's up!"),
+  });
 
   const nextQuadratic = () => {
     setQuadratic(generateQuadratic());
     setFirst('');
     setSecond('');
   };
+
+  const canSubmit = first.trim() !== '' && second.trim() !== '';
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -83,7 +80,7 @@ export default function FactoringChallenge({ count, onFail, onRestart, onComplet
       setNumber(1); // User has to start over if they fail just one
       setMessage('');
       nextQuadratic();
-      onRestart();
+      onSilence();
     } else if (number >= count) {
       onComplete();
     } else {
@@ -92,13 +89,8 @@ export default function FactoringChallenge({ count, onFail, onRestart, onComplet
     }
   };
 
-  const canSubmit = first.trim() !== '' && second.trim() !== '';
-
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.center}>
         <Text>
           Question {number} of {count}
@@ -111,17 +103,10 @@ export default function FactoringChallenge({ count, onFail, onRestart, onComplet
 
       {failed ? (
         <Text style={[styles.message, { color: theme.colors.error }]}>
-          {message} The alarm stays on until you solve this one.
+          {message} Your neighbors will be awoken!
         </Text>
       ) : (
-        <View style={styles.center}>
-          <ProgressBar
-            progress={remainingMs / TIME_LIMIT_MS}
-            color={remainingMs < 3_000 ? theme.colors.error : theme.colors.primary}
-            style={styles.timer}
-          />
-          <Text>{Math.ceil(remainingMs / 1000)} s</Text>
-        </View>
+        <CountdownBar remainingMs={remainingMs} limitMs={TIME_LIMIT_MS} />
       )}
 
       <View style={styles.inputs}>
@@ -137,6 +122,7 @@ export default function FactoringChallenge({ count, onFail, onRestart, onComplet
           onSubmitEditing={() => secondInput.current?.focus()}
         />
         <TextInput
+          // `any` because Paper's TextInput types its `ref` too narrowly to accept anything else.
           ref={(instance: any) => {
             secondInput.current = instance;
           }}

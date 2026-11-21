@@ -14,11 +14,6 @@ export const styles = StyleSheet.create({
   expression: {
     fontSize: 44,
   },
-  timer: {
-    alignSelf: 'stretch',
-    height: 8,
-    borderRadius: 4,
-  },
   inputs: {
     flexDirection: 'row',
     gap: 12,

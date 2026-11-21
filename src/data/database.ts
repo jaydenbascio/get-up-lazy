@@ -11,6 +11,7 @@ const MIGRATIONS = [
   // 1: initial schema
   // - `sounds.file` is the name of the audio file in the app's private sounds folder.
   // - `alarms.days` is a bitmask (Sunday = bit 0 ... Saturday = bit 6).
+  // - `alarm_steps` represents the QR codes you have to scan for each step in your morning routine
   `CREATE TABLE sounds (
      id   INTEGER PRIMARY KEY,
      name TEXT NOT NULL,
@@ -24,6 +25,16 @@ const MIGRATIONS = [
      days     INTEGER NOT NULL DEFAULT 0 CHECK (days BETWEEN 0 AND 127),
      sound_id INTEGER NOT NULL REFERENCES sounds (id),
      quadratic_count INTEGER NOT NULL DEFAULT 3 CHECK (quadratic_count BETWEEN 1 AND 10)
+   );
+
+   CREATE TABLE alarm_steps (
+     id                 INTEGER PRIMARY KEY,
+     alarm_id           INTEGER NOT NULL REFERENCES alarms (id) ON DELETE CASCADE,
+     position           INTEGER NOT NULL,
+     name               TEXT NOT NULL,
+     qr_value           TEXT NOT NULL,
+     time_limit_seconds INTEGER NOT NULL CHECK (time_limit_seconds BETWEEN 5 AND 600),
+     UNIQUE (alarm_id, position)
    );`,
 ];
 

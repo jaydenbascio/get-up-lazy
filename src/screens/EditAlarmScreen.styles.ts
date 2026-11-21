@@ -20,6 +20,9 @@ export const styles = StyleSheet.create({
   section: {
     gap: 12,
   },
+  stepSeparator: {
+    height: 12,
+  },
   days: {
     flexDirection: 'row',
     gap: 8,

@@ -6,7 +6,7 @@ import { BackHandler, View } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import notifee from 'react-native-notify-kit';
 
-import FactoringChallenge from '../components/FactoringChallenge';
+import { FactoringChallenge, QrChallenge } from '../components/challenges';
 import { getAlarm } from '../data/alarms';
 import { getSoundUri } from '../data/soundStorage';
 import { getSound } from '../data/sounds';
@@ -27,7 +27,7 @@ export default function RingScreen({ navigation, route }: Props) {
   const alarmId = 'alarmId' in route.params ? route.params.alarmId : null;
   const testAlarm = 'alarm' in route.params ? route.params.alarm : null;
   const [alarm, setAlarm] = useState<AlarmDraft | null>(null);
-  const [factoring, setFactoring] = useState(false);
+  const [phase, setPhase] = useState<'ringing' | 'factoring' | 'scanning'>('ringing');
 
   // The alarm can only be stopped with "Next", so the back button does nothing here.
   useEffect(() => {
@@ -64,16 +64,34 @@ export default function RingScreen({ navigation, route }: Props) {
 
   const handleNext = () => {
     player.pause();
-    setFactoring(true);
+    setPhase('factoring');
   };
 
-  if (factoring && alarm) {
+  // Failing a challenge starts the alarm again. Solving it afterwards silences it again.
+  const challengeProps = {
+    onFail: () => player.play(),
+    onSilence: () => player.pause(),
+  };
+
+  if (phase === 'factoring' && alarm) {
     return (
       <View style={[styles.challenge, { backgroundColor: theme.colors.background }]}>
         <FactoringChallenge
+          {...challengeProps}
           count={alarm.quadraticCount}
-          onFail={() => player.play()}
-          onRestart={() => player.pause()}
+          // The QR steps come next, if the alarm has any.
+          onComplete={() => (alarm.steps.length > 0 ? setPhase('scanning') : navigation.goBack())}
+        />
+      </View>
+    );
+  }
+
+  if (phase === 'scanning' && alarm) {
+    return (
+      <View style={[styles.challenge, { backgroundColor: theme.colors.background }]}>
+        <QrChallenge
+          {...challengeProps}
+          steps={alarm.steps}
           onComplete={() => navigation.goBack()}
         />
       </View>
