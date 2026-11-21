@@ -6,6 +6,7 @@ import CountdownBar from './CountdownBar';
 import { styles } from './FactoringChallenge.styles';
 import { formatQuadratic, generateQuadratic, isCorrectAnswer, parseInteger } from './quadratic';
 import { useCountdown } from './useCountdown';
+import { useFlash } from './useFlash';
 
 const TIME_LIMIT_MS = 20_000;
 
@@ -36,7 +37,11 @@ export default function FactoringChallenge({ count, onFail, onSilence, onComplet
   const [second, setSecond] = useState('');
   const [message, setMessage] = useState('');
 
+  const { flash, flashThen, overlay } = useFlash();
+  const completing = useRef(false);
+
   const fail = (reason: string) => {
+    flash('error');
     setFailed(true);
     setMessage(reason);
     onFail();
@@ -59,7 +64,7 @@ export default function FactoringChallenge({ count, onFail, onSilence, onComplet
   const canSubmit = first.trim() !== '' && second.trim() !== '';
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || completing.current) return;
 
     const answer = [parseInteger(first), parseInteger(second)];
     const correct =
@@ -68,83 +73,92 @@ export default function FactoringChallenge({ count, onFail, onSilence, onComplet
       isCorrectAnswer(quadratic, [answer[0], answer[1]]);
 
     if (!correct) {
-      if (!failed) fail('Wrong answer!');
-      else setMessage('Not quite. Try again.');
+      if (!failed) {
+        fail('Wrong answer!');
+      } else {
+        flash('error');
+        setMessage('Not quite. Try again.');
+      }
       setFirst('');
       setSecond('');
       return;
     }
 
     if (failed) {
+      flash('success');
       setFailed(false);
       setNumber(1); // User has to start over if they fail just one
       setMessage('');
       nextQuadratic();
       onSilence();
     } else if (number >= count) {
-      onComplete();
+      completing.current = true;
+      flashThen('success', onComplete);
     } else {
+      flash('success');
       setNumber((n) => n + 1);
       nextQuadratic();
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.center}>
-        <Text>
-          Question {number} of {count}
-        </Text>
-        <Text style={[styles.expression, { color: theme.colors.primary }]}>
-          {formatQuadratic(quadratic)}
-        </Text>
-        <Text>Find the zeros</Text>
-      </View>
+    <View style={styles.root}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.center}>
+          <Text>
+            Question {number} of {count}
+          </Text>
+          <Text style={[styles.expression, { color: theme.colors.primary }]}>
+            {formatQuadratic(quadratic)}
+          </Text>
+          <Text>Find the zeros</Text>
+        </View>
 
-      {failed ? (
-        <Text style={[styles.message, { color: theme.colors.error }]}>
-          {message} Your neighbors will be awoken!
-        </Text>
-      ) : (
-        <CountdownBar remainingMs={remainingMs} limitMs={TIME_LIMIT_MS} />
-      )}
+        {failed ? (
+          <Text style={[styles.message, { color: theme.colors.error }]}>
+            {message} Your neighbors will be awoken!
+          </Text>
+        ) : (
+          <CountdownBar remainingMs={remainingMs} limitMs={TIME_LIMIT_MS} />
+        )}
 
-      <View style={styles.inputs}>
-        <TextInput
-          style={styles.input}
-          mode="outlined"
-          label="First zero"
-          value={first}
-          onChangeText={setFirst}
-          keyboardType="numeric"
-          autoFocus
-          returnKeyType="next"
-          onSubmitEditing={() => secondInput.current?.focus()}
-        />
-        <TextInput
-          // `any` because Paper's TextInput types its `ref` too narrowly to accept anything else.
-          ref={(instance: any) => {
-            secondInput.current = instance;
-          }}
-          style={styles.input}
-          mode="outlined"
-          label="Second zero"
-          value={second}
-          onChangeText={setSecond}
-          keyboardType="numeric"
-          onSubmitEditing={handleSubmit}
-        />
-      </View>
+        <View style={styles.inputs}>
+          <TextInput
+            style={styles.input}
+            mode="outlined"
+            label="First zero"
+            value={first}
+            onChangeText={setFirst}
+            keyboardType="numeric"
+            autoFocus
+            returnKeyType="next"
+            onSubmitEditing={() => secondInput.current?.focus()}
+          />
+          <TextInput
+            ref={(instance: any) => {
+              secondInput.current = instance;
+            }}
+            style={styles.input}
+            mode="outlined"
+            label="Second zero"
+            value={second}
+            onChangeText={setSecond}
+            keyboardType="numeric"
+            onSubmitEditing={handleSubmit}
+          />
+        </View>
 
-      <Button
-        mode="contained"
-        style={styles.button}
-        contentStyle={styles.buttonContent}
-        disabled={!canSubmit}
-        onPress={handleSubmit}
-      >
-        Check
-      </Button>
-    </ScrollView>
+        <Button
+          mode="contained"
+          style={styles.button}
+          contentStyle={styles.buttonContent}
+          disabled={!canSubmit}
+          onPress={handleSubmit}
+        >
+          Check
+        </Button>
+      </ScrollView>
+      {overlay}
+    </View>
   );
 }

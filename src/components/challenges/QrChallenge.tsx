@@ -9,6 +9,7 @@ import CameraScanner from '../CameraScanner';
 import CountdownBar from './CountdownBar';
 import { styles } from './QrChallenge.styles';
 import { useCountdown } from './useCountdown';
+import { useFlash } from './useFlash';
 
 /** After a code is accepted, don't detect QR codes for this long so one code isn't counted twice. */
 const SCAN_COOLDOWN_MS = 1_500;
@@ -32,6 +33,8 @@ export default function QrChallenge({ steps, onFail, onSilence, onComplete }: Pr
   const [failed, setFailed] = useState(false);
   const [wrongCode, setWrongCode] = useState(false);
 
+  const { flash, flashThen, overlay } = useFlash();
+
   const step = steps[index];
   const limitMs = step.timeLimitSeconds * 1000;
 
@@ -40,6 +43,7 @@ export default function QrChallenge({ steps, onFail, onSilence, onComplete }: Pr
     running: !failed,
     resetKey: index,
     onExpire: () => {
+      flash('error');
       setFailed(true);
       onFail();
     },
@@ -47,27 +51,39 @@ export default function QrChallenge({ steps, onFail, onSilence, onComplete }: Pr
 
   const lastAccepted = useRef(0);
   const wrongTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const wrongHintShowing = useRef(false);
   useEffect(() => () => clearTimeout(wrongTimer.current), []);
 
   const handleScan = ({ data: value }: BarcodeScanningResult) => {
     if (Date.now() - lastAccepted.current < SCAN_COOLDOWN_MS) return;
 
     if (value !== step.qrValue) {
+      if (!wrongHintShowing.current) flash('error');
+      wrongHintShowing.current = true;
+
       setWrongCode(true);
       clearTimeout(wrongTimer.current);
-      wrongTimer.current = setTimeout(() => setWrongCode(false), WRONG_CODE_HINT_MS);
+      wrongTimer.current = setTimeout(() => {
+        wrongHintShowing.current = false;
+        setWrongCode(false);
+      }, WRONG_CODE_HINT_MS);
       return;
     }
 
     lastAccepted.current = Date.now();
+    wrongHintShowing.current = false;
     setWrongCode(false);
     if (failed) {
       setFailed(false);
       onSilence();
     }
 
-    if (index + 1 >= steps.length) onComplete();
-    else setIndex(index + 1);
+    if (index + 1 >= steps.length) {
+      flashThen('success', onComplete);
+    } else {
+      flash('success');
+      setIndex(index + 1);
+    }
   };
 
   return (
@@ -96,6 +112,8 @@ export default function QrChallenge({ steps, onFail, onSilence, onComplete }: Pr
           </Text>
         )}
       </View>
+
+      {overlay}
     </View>
   );
 }

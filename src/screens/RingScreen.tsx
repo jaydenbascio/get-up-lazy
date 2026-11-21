@@ -6,7 +6,7 @@ import { BackHandler, View } from 'react-native';
 import { Button, Text, useTheme } from 'react-native-paper';
 import notifee from 'react-native-notify-kit';
 
-import { FactoringChallenge, QrChallenge } from '../components/challenges';
+import { Celebration, FactoringChallenge, QrChallenge } from '../components/challenges';
 import { getAlarm } from '../data/alarms';
 import { getSoundUri } from '../data/soundStorage';
 import { getSound } from '../data/sounds';
@@ -27,7 +27,9 @@ export default function RingScreen({ navigation, route }: Props) {
   const alarmId = 'alarmId' in route.params ? route.params.alarmId : null;
   const testAlarm = 'alarm' in route.params ? route.params.alarm : null;
   const [alarm, setAlarm] = useState<AlarmDraft | null>(null);
-  const [phase, setPhase] = useState<'ringing' | 'factoring' | 'scanning'>('ringing');
+  const [phase, setPhase] = useState<'ringing' | 'factoring' | 'scanning' | 'celebrating'>(
+    'ringing',
+  );
 
   // The alarm can only be stopped with "Next", so the back button does nothing here.
   useEffect(() => {
@@ -80,7 +82,7 @@ export default function RingScreen({ navigation, route }: Props) {
           {...challengeProps}
           count={alarm.quadraticCount}
           // The QR steps come next, if the alarm has any.
-          onComplete={() => (alarm.steps.length > 0 ? setPhase('scanning') : navigation.goBack())}
+          onComplete={() => setPhase(alarm.steps.length > 0 ? 'scanning' : 'celebrating')}
         />
       </View>
     );
@@ -92,8 +94,17 @@ export default function RingScreen({ navigation, route }: Props) {
         <QrChallenge
           {...challengeProps}
           steps={alarm.steps}
-          onComplete={() => navigation.goBack()}
+          onComplete={() => setPhase('celebrating')}
         />
+      </View>
+    );
+  }
+
+  // Everything is done! The alarm is over when the user presses "finish" on the celebration page
+  if (phase === 'celebrating') {
+    return (
+      <View style={styles.challenge}>
+        <Celebration onFinish={() => navigation.goBack()} />
       </View>
     );
   }
