@@ -9,6 +9,7 @@ import { TimePickerModal } from 'react-native-paper-dates';
 
 import NameSoundDialog from '../components/NameSoundDialog';
 import SoundRow from '../components/SoundRow';
+import { cancelAlarm, scheduleAlarm } from '../alarms/scheduler';
 import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alarms';
 import { getSoundUri } from '../data/soundStorage';
 import { addSound, deleteSound, getSounds, isDefaultSound } from '../data/sounds';
@@ -139,7 +140,7 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
 
   const handleSave = async () => {
     setBusy(true);
-    await saveAlarm(db, draft);
+    await scheduleAlarm(await saveAlarm(db, draft));
     onClose();
   };
 
@@ -147,6 +148,7 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
     confirmDelete('Delete alarm?', async () => {
       setBusy(true);
       await deleteAlarm(db, draft.id!);
+      await cancelAlarm(draft.id!);
       onClose();
     });
 

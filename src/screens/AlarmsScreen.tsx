@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { Appbar, Card, FAB, Text, useTheme } from 'react-native-paper';
 
+import { cancelAlarm } from '../alarms/scheduler';
 import SwipeToDelete from '../components/SwipeToDelete';
 import { deleteAlarm, getAlarms } from '../data/alarms';
 import type { RootStackParamList } from '../navigation/types';
@@ -36,6 +37,7 @@ export default function AlarmsScreen() {
   const handleDelete = (alarm: Alarm) =>
     confirmDelete('Delete alarm?', async () => {
       await deleteAlarm(db, alarm.id);
+      await cancelAlarm(alarm.id);
       setAlarms((current) => current.filter((a) => a.id !== alarm.id));
     });
 

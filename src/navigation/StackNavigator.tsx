@@ -5,7 +5,7 @@
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { EditAlarmScreen } from '../screens';
+import { EditAlarmScreen, RingScreen } from '../screens';
 import TabNavigator from './TabNavigator';
 import type { RootStackParamList } from './types';
 
@@ -17,6 +17,7 @@ export default function StackNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={TabNavigator} />
       <Stack.Screen name="EditAlarm" component={EditAlarmScreen} />
+      <Stack.Screen name="Ring" component={RingScreen} options={{ gestureEnabled: false }} />
     </Stack.Navigator>
   );
 }

@@ -2,6 +2,8 @@ export type RootStackParamList = {
   Tabs: undefined;
   /** If `alarmId` is defined, edit that alarm. Otherwise create a new one. */
   EditAlarm: { alarmId?: number } | undefined;
+  /** Shown while an alarm is going off. */
+  Ring: { alarmId: number };
 };
 
 export type TabParamList = {

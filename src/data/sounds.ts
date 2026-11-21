@@ -9,6 +9,10 @@ export function getSounds(db: SQLiteDatabase): Promise<Sound[]> {
   return db.getAllAsync<Sound>('SELECT id, name, file FROM sounds ORDER BY id');
 }
 
+export function getSound(db: SQLiteDatabase, id: number): Promise<Sound | null> {
+  return db.getFirstAsync<Sound>('SELECT id, name, file FROM sounds WHERE id = ?', id);
+}
+
 /**
  * Add every default sound to the database if not already there
  */
