@@ -7,9 +7,11 @@ import { Alert, ScrollView, View } from 'react-native';
 import { Appbar, Button, RadioButton, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { TimePickerModal } from 'react-native-paper-dates';
 
+import NameSoundDialog from '../components/NameSoundDialog';
+import SoundRow from '../components/SoundRow';
 import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alarms';
 import { getSoundUri } from '../data/soundStorage';
-import { addSound, getSounds } from '../data/sounds';
+import { addSound, deleteSound, getSounds, isDefaultSound } from '../data/sounds';
 import type { RootStackParamList } from '../navigation/types';
 import type { AlarmDraft } from '../types/alarm';
 import type { Sound } from '../types/sound';
@@ -72,6 +74,7 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
   // Draft of alarm before being saved
   const [draft, setDraft] = useState<AlarmDraft>(initial);
   const [sounds, setSounds] = useState<Sound[]>(initialSounds);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -82,18 +85,51 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
     player.play();
   };
 
-  // Add an audio file with the file picker
   const handleAddSound = async () => {
     try {
       const picked = await File.pickFileAsync({ mimeTypes: 'audio/*' });
-      if (picked.canceled) return;
+      if (!picked.canceled) setPendingFile(picked.result);
+    } catch (error) {
+      Alert.alert('Could not add the file', error instanceof Error ? error.message : String(error));
+    }
+  };
 
-      const sound = await addSound(db, picked.result);
+  const handleNameConfirmed = async (name: string) => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    setPendingFile(null);
+
+    try {
+      const sound = await addSound(db, file, name);
       setSounds((current) => [...current, sound]);
       selectSound(sound);
     } catch (error) {
       Alert.alert('Could not add the file', error instanceof Error ? error.message : String(error));
     }
+  };
+
+  // Delete a sound the user added
+  const handleDeleteSound = (sound: Sound) => {
+    Alert.alert(`Delete "${sound.name}"?`, 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteConfirmedSound(sound) },
+    ]);
+  };
+
+  const deleteConfirmedSound = async (sound: Sound) => {
+    try {
+      await deleteSound(db, sound);
+    } catch (error) {
+      Alert.alert('Could not delete the sound', error instanceof Error ? error.message : String(error));
+      return;
+    }
+
+    player.pause();
+    const remaining = sounds.filter((s) => s.id !== sound.id);
+    setSounds(remaining);
+    setDraft((current) =>
+      current.soundId === sound.id ? { ...current, soundId: remaining[0].id } : current,
+    );
   };
 
   const toggleDay = (day: number) => {
@@ -196,7 +232,11 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
             onValueChange={(value) => selectSound(sounds.find((s) => String(s.id) === value)!)}
           >
             {sounds.map((sound) => (
-              <RadioButton.Item key={sound.id} label={sound.name} value={String(sound.id)} />
+              <SoundRow
+                key={sound.id}
+                sound={sound}
+                onDelete={isDefaultSound(sound) ? undefined : () => handleDeleteSound(sound)}
+              />
             ))}
           </RadioButton.Group>
           <Button mode="outlined" icon="plus" onPress={handleAddSound}>
@@ -204,6 +244,16 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
           </Button>
         </View>
       </ScrollView>
+
+      {pendingFile && (
+        <NameSoundDialog
+          key={pendingFile.uri}
+          visible
+          initialName={pendingFile.name.replace(/\.[^.]+$/, '')}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={handleNameConfirmed}
+        />
+      )}
 
       <TimePickerModal
         visible={pickerVisible}

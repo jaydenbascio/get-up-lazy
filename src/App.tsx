@@ -1,9 +1,11 @@
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PaperProvider } from 'react-native-paper';
 import { en, registerTranslation } from 'react-native-paper-dates';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { styles } from './App.styles';
 import { DATABASE_NAME, initializeDatabase } from './data/database';
 import StackNavigator from './navigation/StackNavigator';
 import { NavigationProvider } from './NavigationProvider';
@@ -13,15 +15,17 @@ registerTranslation('en', en);
 
 export default function App() {
   return (
-    <NavigationProvider>
-      <SafeAreaProvider>
-        <PaperProvider theme={paperTheme}>
-          <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase}>
-            <StackNavigator />
-          </SQLiteProvider>
-          <StatusBar style="auto" />
-        </PaperProvider>
-      </SafeAreaProvider>
-    </NavigationProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <NavigationProvider>
+        <SafeAreaProvider>
+          <PaperProvider theme={paperTheme}>
+            <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase}>
+              <StackNavigator />
+            </SQLiteProvider>
+            <StatusBar style="auto" />
+          </PaperProvider>
+        </SafeAreaProvider>
+      </NavigationProvider>
+    </GestureHandlerRootView>
   );
 }
