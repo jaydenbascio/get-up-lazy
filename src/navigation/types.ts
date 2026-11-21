@@ -1,7 +1,9 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 import type { AlarmDraft } from '../types/alarm';
 
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParamList> | undefined;
   /** If `alarmId` is defined, edit that alarm. Otherwise create a new one. */
   EditAlarm: { alarmId?: number } | undefined;
   /**

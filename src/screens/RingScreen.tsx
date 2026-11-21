@@ -33,6 +33,8 @@ export default function RingScreen({ navigation, route }: Props) {
   );
 
 
+  const [result, setResult] = useState<{ phoneMs: number; totalMs: number } | null>(null);
+
   // For the report
   const rangAt = useRef(0);
   const phoneMs = useRef(0);
@@ -79,7 +81,10 @@ export default function RingScreen({ navigation, route }: Props) {
   };
 
   const finish = () => {
+    const totalMs = Date.now() - rangAt.current;
+    setResult({ phoneMs: phoneMs.current, totalMs });
     setPhase('celebrating');
+
     if (testAlarm !== null || recorded.current || !alarm) return;
     recorded.current = true;
 
@@ -87,7 +92,7 @@ export default function RingScreen({ navigation, route }: Props) {
       alarmId: alarm.id ?? null,
       rangAt: rangAt.current,
       phoneMs: phoneMs.current,
-      totalMs: Date.now() - rangAt.current,
+      totalMs,
     }).catch((error) => console.warn('Could not save the wake-up', error));
   };
 
@@ -123,10 +128,17 @@ export default function RingScreen({ navigation, route }: Props) {
   }
 
   // Everything is done! The alarm is over when the user presses "finish" on the celebration page
-  if (phase === 'celebrating') {
+  if (phase === 'celebrating' && result) {
     return (
       <View style={styles.challenge}>
-        <Celebration onFinish={() => navigation.goBack()} />
+        <Celebration
+          phoneMs={result.phoneMs}
+          totalMs={result.totalMs}
+          // Real alarms send you to the graph tab
+          onFinish={() =>
+            testAlarm === null ? navigation.popTo('Tabs', { screen: 'Graph' }) : navigation.goBack()
+          }
+        />
       </View>
     );
   }

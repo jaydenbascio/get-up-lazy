@@ -3,9 +3,14 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-evenly',
     alignItems: 'center',
     padding: 24,
+  },
+  main: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
   },
   content: {
     alignItems: 'center',
@@ -23,6 +28,18 @@ export const styles = StyleSheet.create({
   subtitle: {
     fontSize: 20,
     textAlign: 'center',
+  },
+  results: {
+    flexDirection: 'row',
+    gap: 32,
+  },
+  result: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  resultValue: {
+    fontSize: 28,
+    fontWeight: '600',
   },
   button: {
     alignSelf: 'stretch',
