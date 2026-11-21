@@ -7,6 +7,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     padding: 24,
   },
+  challenge: {
+    flex: 1,
+  },
   label: {
     fontSize: 20,
   },

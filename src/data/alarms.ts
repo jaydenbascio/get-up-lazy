@@ -2,9 +2,17 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { Alarm, AlarmDraft } from '../types/alarm';
 
-type AlarmRow = { id: number; hour: number; minute: number; days: number; soundId: number };
+type AlarmRow = {
+  id: number;
+  hour: number;
+  minute: number;
+  days: number;
+  soundId: number;
+  quadraticCount: number;
+};
 
-const SELECT_ALARM = 'SELECT id, hour, minute, days, sound_id AS soundId FROM alarms';
+const SELECT_ALARM =
+  'SELECT id, hour, minute, days, sound_id AS soundId, quadratic_count AS quadraticCount FROM alarms';
 
 // Turn a list of days (0 = Sunday, 6 = Saturday) into a single 7 bit bitmask
 const daysToMask = (days: number[]): number => days.reduce((mask, day) => mask | (1 << day), 0);
@@ -19,7 +27,7 @@ const toAlarm = ({ days, ...rest }: AlarmRow): Alarm => ({
 
 /** @brief Create a new alarm with default values (for creating new alarms) */
 export function createBlankAlarm(soundId: number): AlarmDraft {
-  return { hour: 7, minute: 0, days: [], soundId };
+  return { hour: 7, minute: 0, days: [], soundId, quadraticCount: 3 };
 }
 
 /** @brief Get all alarms ordered by time */
@@ -43,21 +51,23 @@ export async function saveAlarm(db: SQLiteDatabase, alarm: AlarmDraft): Promise<
 
   if (alarm.id === undefined) {
     const { lastInsertRowId } = await db.runAsync(
-      'INSERT INTO alarms (hour, minute, days, sound_id) VALUES (?, ?, ?, ?)',
+      'INSERT INTO alarms (hour, minute, days, sound_id, quadratic_count) VALUES (?, ?, ?, ?, ?)',
       alarm.hour,
       alarm.minute,
       days,
       alarm.soundId,
+      alarm.quadraticCount,
     );
     return { ...alarm, id: lastInsertRowId };
   }
 
   await db.runAsync(
-    'UPDATE alarms SET hour = ?, minute = ?, days = ?, sound_id = ? WHERE id = ?',
+    'UPDATE alarms SET hour = ?, minute = ?, days = ?, sound_id = ?, quadratic_count = ? WHERE id = ?',
     alarm.hour,
     alarm.minute,
     days,
     alarm.soundId,
+    alarm.quadraticCount,
     alarm.id,
   );
   return { ...alarm, id: alarm.id };

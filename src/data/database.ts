@@ -22,7 +22,8 @@ const MIGRATIONS = [
      hour     INTEGER NOT NULL CHECK (hour BETWEEN 0 AND 23),
      minute   INTEGER NOT NULL CHECK (minute BETWEEN 0 AND 59),
      days     INTEGER NOT NULL DEFAULT 0 CHECK (days BETWEEN 0 AND 127),
-     sound_id INTEGER NOT NULL REFERENCES sounds (id)
+     sound_id INTEGER NOT NULL REFERENCES sounds (id),
+     quadratic_count INTEGER NOT NULL DEFAULT 3 CHECK (quadratic_count BETWEEN 1 AND 10)
    );`,
 ];
 

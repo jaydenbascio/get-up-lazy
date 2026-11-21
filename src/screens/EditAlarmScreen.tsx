@@ -1,3 +1,4 @@
+import Slider from '@react-native-community/slider';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAudioPlayer } from 'expo-audio';
 import { File } from 'expo-file-system';
@@ -14,7 +15,7 @@ import { createBlankAlarm, deleteAlarm, getAlarm, saveAlarm } from '../data/alar
 import { getSoundUri } from '../data/soundStorage';
 import { addSound, deleteSound, getSounds, isDefaultSound } from '../data/sounds';
 import type { RootStackParamList } from '../navigation/types';
-import type { AlarmDraft } from '../types/alarm';
+import { type AlarmDraft, MAX_QUADRATIC_COUNT, MIN_QUADRATIC_COUNT } from '../types/alarm';
 import type { Sound } from '../types/sound';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
 import { confirmDelete } from '../utils/confirm';
@@ -57,6 +58,7 @@ export default function EditAlarmScreen({ navigation, route }: Props) {
       initialSounds={loaded.sounds}
       title={isNew ? 'New alarm' : 'Edit alarm'}
       onClose={navigation.goBack}
+      onTest={(alarm) => navigation.navigate('Ring', { alarm })}
     />
   );
 }
@@ -66,9 +68,10 @@ type FormProps = {
   initialSounds: Sound[];
   title: string;
   onClose: () => void;
+  onTest: (alarm: AlarmDraft) => void;
 };
 
-function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
+function EditAlarmForm({ initial, initialSounds, title, onClose, onTest }: FormProps) {
   const theme = useTheme();
   const db = useSQLiteContext();
   const player = useAudioPlayer();
@@ -85,6 +88,12 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
     setDraft((current) => ({ ...current, soundId: sound.id }));
     player.replace({ uri: getSoundUri(sound.file) });
     player.play();
+  };
+
+  // Rings the alarm immediately with its unsaved settings
+  const handleTestAlarm = () => {
+    player.pause(); // Stop any sound preview first.
+    onTest(draft);
   };
 
   const handleAddSound = async () => {
@@ -216,6 +225,21 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
         </View>
 
         <View style={styles.section}>
+          <Text variant="titleMedium">Quadratics to solve: {draft.quadraticCount}</Text>
+          <Slider
+            minimumValue={MIN_QUADRATIC_COUNT}
+            maximumValue={MAX_QUADRATIC_COUNT}
+            step={1}
+            value={draft.quadraticCount}
+            onValueChange={(value) => setDraft((current) => ({ ...current, quadraticCount: value }))}
+            minimumTrackTintColor={theme.colors.primary}
+            thumbTintColor={theme.colors.primary}
+            maximumTrackTintColor={theme.colors.outline}
+            accessibilityLabel="Number of quadratics to solve"
+          />
+        </View>
+
+        <View style={styles.section}>
           <Text variant="titleMedium">Sound</Text>
           <RadioButton.Group
             value={String(draft.soundId)}
@@ -233,6 +257,10 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
             Add file
           </Button>
         </View>
+
+        <Button mode="contained-tonal" icon="alarm" onPress={handleTestAlarm}>
+          Test Alarm
+        </Button>
       </ScrollView>
 
       {pendingFile && (

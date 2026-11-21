@@ -5,6 +5,7 @@ import notifee, {
   AndroidImportance,
   AndroidNotificationSetting,
   AndroidVisibility,
+  type Notification,
   RepeatFrequency,
   TriggerType,
 } from 'react-native-notify-kit';
@@ -49,6 +50,26 @@ export async function cancelAlarm(alarmId: number): Promise<void> {
   await notifee.cancelTriggerNotifications(ALL_DAYS.map((day) => triggerId(alarmId, day)));
 }
 
+/** The notification that goes off for an alarm */
+function alarmNotification(alarm: Alarm, id: string, channelId: string): Notification {
+  return {
+    id,
+    title: 'Alarm',
+    body: formatTime(alarm.hour, alarm.minute),
+    data: { alarmId: String(alarm.id) },
+    android: {
+      channelId,
+      category: AndroidCategory.ALARM,
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
+      ongoing: true, // Can't be swiped away: the alarm is stopped from inside the app.
+      autoCancel: false,
+      pressAction: { id: 'default', launchActivity: 'default' },
+      fullScreenAction: { id: 'default', launchActivity: 'default' },
+    },
+  };
+}
+
 /**
  * @brief Schedules an alarm to ring at its time on each selected day, every week.
  */
@@ -61,22 +82,7 @@ export async function scheduleAlarm(alarm: Alarm): Promise<void> {
   await Promise.all(
     alarm.days.map((day) =>
       notifee.createTriggerNotification(
-        {
-          id: triggerId(alarm.id, day),
-          title: 'Alarm',
-          body: formatTime(alarm.hour, alarm.minute),
-          data: { alarmId: String(alarm.id) },
-          android: {
-            channelId,
-            category: AndroidCategory.ALARM,
-            importance: AndroidImportance.HIGH,
-            visibility: AndroidVisibility.PUBLIC,
-            ongoing: true, // Can't be swiped away: the alarm is stopped from inside the app.
-            autoCancel: false,
-            pressAction: { id: 'default', launchActivity: 'default' },
-            fullScreenAction: { id: 'default', launchActivity: 'default' },
-          },
-        },
+        alarmNotification(alarm, triggerId(alarm.id, day), channelId),
         {
           type: TriggerType.TIMESTAMP,
           timestamp: nextOccurrence(day, alarm.hour, alarm.minute),
