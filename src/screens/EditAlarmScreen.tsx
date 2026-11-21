@@ -16,6 +16,7 @@ import type { RootStackParamList } from '../navigation/types';
 import type { AlarmDraft } from '../types/alarm';
 import type { Sound } from '../types/sound';
 import { DAY_NAMES, DAY_ORDER } from '../utils/days';
+import { confirmDelete } from '../utils/confirm';
 import { formatTime } from '../utils/time';
 import { styles } from './EditAlarmScreen.styles';
 
@@ -109,28 +110,23 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
   };
 
   // Delete a sound the user added
-  const handleDeleteSound = (sound: Sound) => {
-    Alert.alert(`Delete "${sound.name}"?`, 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteConfirmedSound(sound) },
-    ]);
-  };
+  const handleDeleteSound = (sound: Sound) =>
+    confirmDelete(`Delete "${sound.name}"?`, async () => {
+      try {
+        await deleteSound(db, sound);
+      } catch (error) {
+        Alert.alert('Could not delete the sound', error instanceof Error ? error.message : String(error));
+        return;
+      }
 
-  const deleteConfirmedSound = async (sound: Sound) => {
-    try {
-      await deleteSound(db, sound);
-    } catch (error) {
-      Alert.alert('Could not delete the sound', error instanceof Error ? error.message : String(error));
-      return;
-    }
-
-    player.pause();
-    const remaining = sounds.filter((s) => s.id !== sound.id);
-    setSounds(remaining);
-    setDraft((current) =>
-      current.soundId === sound.id ? { ...current, soundId: remaining[0].id } : current,
-    );
-  };
+      player.pause();
+      const remaining = sounds.filter((s) => s.id !== sound.id);
+      setSounds(remaining);
+      // This alarm's draft may have had the deleted sound selected so fall back to the first one
+      setDraft((current) =>
+        current.soundId === sound.id ? { ...current, soundId: remaining[0].id } : current,
+      );
+    });
 
   const toggleDay = (day: number) => {
     setDraft((current) => ({
@@ -147,20 +143,12 @@ function EditAlarmForm({ initial, initialSounds, title, onClose }: FormProps) {
     onClose();
   };
 
-  const handleDelete = () => {
-    Alert.alert('Delete alarm?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          await deleteAlarm(db, draft.id!);
-          onClose();
-        },
-      },
-    ]);
-  };
+  const handleDelete = () =>
+    confirmDelete('Delete alarm?', async () => {
+      setBusy(true);
+      await deleteAlarm(db, draft.id!);
+      onClose();
+    });
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

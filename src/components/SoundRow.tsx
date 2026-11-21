@@ -1,9 +1,8 @@
 import { View } from 'react-native';
-import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { IconButton, RadioButton, useTheme } from 'react-native-paper';
+import { RadioButton, useTheme } from 'react-native-paper';
 
 import type { Sound } from '../types/sound';
-import { styles } from './SoundRow.styles';
+import SwipeToDelete from './SwipeToDelete';
 
 type Props = {
   sound: Sound;
@@ -18,20 +17,8 @@ export default function SoundRow({ sound, onDelete }: Props) {
   if (!onDelete) return item;
 
   return (
-    <ReanimatedSwipeable
-      overshootLeft={false}
-      renderLeftActions={() => (
-        <View style={[styles.deleteAction, { backgroundColor: theme.colors.error }]}>
-          <IconButton
-            icon="delete"
-            iconColor={theme.colors.onError}
-            accessibilityLabel={`Delete ${sound.name}`}
-            onPress={onDelete}
-          />
-        </View>
-      )}
-    >
+    <SwipeToDelete label={`Delete ${sound.name}`} onDelete={onDelete}>
       <View style={{ backgroundColor: theme.colors.background }}>{item}</View>
-    </ReanimatedSwipeable>
+    </SwipeToDelete>
   );
 }
